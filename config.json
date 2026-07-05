@@ -1,0 +1,34 @@
+{
+  "video": {
+    "input": "input/background.mp4",
+    "output": "output/final_reel.mp4",
+    "width": 1080,
+    "height": 1920,
+    "crf": 20,
+    "preset": "medium"
+  },
+
+  "audio": {
+    "input": "input/voice.mp3"
+  },
+
+  "logo": {
+    "input": "input/Logo.png",
+    "enabled": true,
+    "width": 140,
+    "margin_x": 25,
+    "margin_y": 25,
+    "position": "top-right"
+  },
+
+  "subtitles": {
+    "input": "input/captions.srt",
+    "enabled": true,
+    "font": "Arial",
+    "font_size": 28,
+    "margin_bottom": 180,
+    "outline": 4,
+    "shadow": 2,
+    "bold": true
+  }
+}
