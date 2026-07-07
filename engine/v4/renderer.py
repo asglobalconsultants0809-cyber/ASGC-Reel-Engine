@@ -6,6 +6,7 @@ from engine.v3.job_card_renderer import JobCardRenderer
 from engine.v4.subtitle_engine import SubtitleEngineV4
 from engine.v4.contact_engine import ContactEngine
 from engine.v4.motion_engine import MotionEngine
+from engine.v4.ai_background_engine import AIBackgroundEngine
 
 
 class RendererV4:
@@ -115,7 +116,11 @@ class RendererV4:
     def render(self, job_data=None):
         job_data = job_data or {}
 
-        self._require(self.background, "background video")
+        from engine.v4.background_video_engine import BackgroundVideoEngine
+
+        ai_image = AIBackgroundEngine().generate(job_data)
+        ai_video = BackgroundVideoEngine(duration=42).create_video(ai_image)
+        self.background = ai_video
         self._require(self.audio, "voice audio")
         self._require(self.logo, "logo")
 
