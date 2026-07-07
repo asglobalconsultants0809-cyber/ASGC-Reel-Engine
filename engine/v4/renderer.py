@@ -5,6 +5,7 @@ from pathlib import Path
 from engine.v3.job_card_renderer import JobCardRenderer
 from engine.v4.subtitle_engine import SubtitleEngineV4
 from engine.v4.contact_engine import ContactEngine
+from engine.v4.motion_engine import MotionEngine
 
 
 class RendererV4:
@@ -21,9 +22,6 @@ class RendererV4:
         self.output = Path("output/final_v4_reel.mp4")
         self.output.parent.mkdir(parents=True, exist_ok=True)
 
-        # Fix: audio is ahead, so subtitles are pulled earlier.
-        # If still delayed, change this from -0.85 to -1.10.
-        # If subtitles become too early, change this from -0.85 to -0.50.
         self.subtitle_shift_seconds = -0.85
 
     def _find_logo(self):
@@ -55,50 +53,53 @@ class RendererV4:
     def _sync_ass_subtitles(self, ass_path):
         raw = Path(ass_path).read_text(encoding="utf-8", errors="ignore")
 
+        pattern = re.compile(
+            r"(?m)^(Dialogue:\s*\d+,)"
+            r"(\d+:\d{2}:\d{2}\.\d{2,3}),"
+            r"(\d+:\d{2}:\d{2}\.\d{2,3})"
+        )
+
         def repl(match):
-            start = self._ass_time_to_seconds(match.group(1)) + self.subtitle_shift_seconds
-            end = self._ass_time_to_seconds(match.group(2)) + self.subtitle_shift_seconds
-            if end <= 0:
-                end = 0.15
-            if end <= start:
-                end = start + 0.15
-            return f"{match.group(0)[:match.start(1)-match.start(0)]}{self._seconds_to_ass_time(start)},{self._seconds_to_ass_time(end)}"
-
-        pattern = re.compile(r"(?m)^(Dialogue:\s*\d+,)(\d+:\d{2}:\d{2}\.\d{2,3}),(\d+:\d{2}:\d{2}\.\d{2,3})")
-
-        def repl2(match):
             start = self._ass_time_to_seconds(match.group(2)) + self.subtitle_shift_seconds
             end = self._ass_time_to_seconds(match.group(3)) + self.subtitle_shift_seconds
+
             if end <= 0:
                 end = 0.15
             if end <= start:
                 end = start + 0.15
-            return f"{match.group(1)}{self._seconds_to_ass_time(start)},{self._seconds_to_ass_time(end)}"
 
-        synced = pattern.sub(repl2, raw)
+            return (
+                f"{match.group(1)}"
+                f"{self._seconds_to_ass_time(start)},"
+                f"{self._seconds_to_ass_time(end)}"
+            )
+
+        synced = pattern.sub(repl, raw)
         self.synced_subtitle_ass.write_text(synced, encoding="utf-8")
         return self.synced_subtitle_ass
 
     def _build_subtitles(self):
         srt = Path("input/captions.srt")
+
         if srt.exists():
             ass = SubtitleEngineV4().generate()
         elif self.subtitle_ass.exists():
             ass = self.subtitle_ass
         else:
-            raise FileNotFoundError("Missing subtitles: input/captions.srt or output/v4_subtitles.ass")
+            raise FileNotFoundError(
+                "Missing subtitles: input/captions.srt or output/v4_subtitles.ass"
+            )
 
         return self._sync_ass_subtitles(ass)
 
     def _filters(self, job_card_path, ass_path):
         ass = self._ffmpeg_path(ass_path)
         contact = ContactEngine(start_time=30.6).ffmpeg_filter()
+        motion = MotionEngine(duration=42).background_motion_filter()
 
         return (
             f"[0:v]"
-            f"scale={self.width}:{self.height}:force_original_aspect_ratio=increase,"
-            f"crop={self.width}:{self.height},"
-            f"fps={self.fps},"
+            f"{motion},"
             f"eq=brightness=0.04:contrast=1.08:saturation=1.08,"
             f"format=rgba[bg];"
 
